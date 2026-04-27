@@ -7,23 +7,17 @@
  * ============================================================
  */
 
-/**
- * Google Sheets Adapter
- * ============================================================
- */
-
 const { google } = require('googleapis');
 const NodeCache = require('node-cache');
 const { DEPARTMENTS, colLetterToIndex, indexToColLetter } = require('../config/Sheetsmapping');
 
-// ✅ MUST BE GLOBAL (FIXES ERROR)
-let sheetsClient = null;
-
-// Initialize cache
+// Initialize cache: TTL from env, default 5 minutes
 const cache = new NodeCache({
   stdTTL: parseInt(process.env.CACHE_TTL || '300'),
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
+
+let sheetsClient = null;
 
 /**
  * Initialize Google Sheets client using service account
@@ -33,28 +27,16 @@ async function getSheetsClient() {
 
   let credentials;
 
-  // ✅ PRIMARY: Render ENV (RECOMMENDED)
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-
-    // 🔥 FIX: newline issue in private key
-    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-  }
-
-  // ✅ OPTIONAL (kept for flexibility)
-  else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  // Option 1: JSON env variable (for hosting)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
-
-  // ❌ REMOVED FILE-BASED APPROACH (CAUSE OF YOUR ERROR)
-  // else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
-  //   credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
-  // }
-
-  else {
+  // Option 2: Key file path
+  else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
+    credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
+  } else {
     throw new Error(
-      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY in environment'
+      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE in .env'
     );
   }
 
@@ -63,17 +45,10 @@ async function getSheetsClient() {
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
-  // ✅ CREATE CLIENT
   sheetsClient = google.sheets({ version: 'v4', auth });
-
   console.log('✅ Google Sheets client initialized');
-
   return sheetsClient;
 }
-
-module.exports = {
-  getSheetsClient,
-};
 
 /**
  * Read all rows from a department's task sheet
