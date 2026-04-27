@@ -11,6 +11,14 @@ console.log("🌐 API BASE URL:", process.env.REACT_APP_API_URL || 'http://local
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('mw_token');
 
+  // 🔥 ADD: FORCE JSON HEADER (VERY IMPORTANT FIX)
+  config.headers['Content-Type'] = 'application/json';
+
+  // 🔥 ADD: Ensure data is properly stringified for POST/PUT
+  if (config.data && typeof config.data === 'object') {
+    config.data = JSON.stringify(config.data);
+  }
+
   // 🔥 DEBUG: Log every request
   console.log("🚀 REQUEST:", {
     url: config.baseURL + config.url,
@@ -96,7 +104,6 @@ export const adminAPI = {
   getStatus: () => api.get('/admin/status'),
 
   // 🔥 ADD THESE (DO NOT REMOVE ABOVE)
-
   getStats: () => api.get('/admin/stats'),
   getManagers: () => api.get('/admin/managers'),
   getEmployees: () => api.get('/admin/employees'),
