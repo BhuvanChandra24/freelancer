@@ -13,4 +13,5 @@ dist/
 .env
 
 # logs
-npm-debug.log* 
+npm-debug.log*
+backend/config/service-account-key.json 
