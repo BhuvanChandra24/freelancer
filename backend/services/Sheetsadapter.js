@@ -33,26 +33,28 @@ async function getSheetsClient() {
 
   let credentials;
 
-  // ✅ NEW: Render ENV support
+  // ✅ PRIMARY: Render ENV (RECOMMENDED)
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 
-    // 🔥 IMPORTANT FIX (newline issue)
+    // 🔥 FIX: newline issue in private key
     credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
-  // Existing support (kept)
+  // ✅ OPTIONAL (kept for flexibility)
   else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
-  else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
-    credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
-  }
+  // ❌ REMOVED FILE-BASED APPROACH (CAUSE OF YOUR ERROR)
+  // else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
+  //   credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
+  // }
 
   else {
     throw new Error(
-      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE in .env'
+      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY in environment'
     );
   }
 
@@ -68,6 +70,10 @@ async function getSheetsClient() {
 
   return sheetsClient;
 }
+
+module.exports = {
+  getSheetsClient,
+};
 
 /**
  * Read all rows from a department's task sheet
