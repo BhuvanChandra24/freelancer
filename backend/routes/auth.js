@@ -87,6 +87,25 @@ router.post('/signup', async (req, res) => {
       body.departments ||
       (body.department ? [body.department] : []);
 
+    // ✅ ================= NEW FIX ADDED =================
+    // Normalize departments (handles wrong formats like '["CRM"]')
+    let cleanDepartments = [];
+
+    if (Array.isArray(departments)) {
+      cleanDepartments = departments;
+    } else if (typeof departments === "string") {
+      try {
+        const parsed = JSON.parse(departments);
+        cleanDepartments = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        cleanDepartments = [departments];
+      }
+    }
+
+    // Final cleanup (trim values)
+    cleanDepartments = cleanDepartments.map(d => (d || "").trim());
+    // ✅ ================= END FIX =================
+
     username = username?.trim();
     password = password?.trim();
     email = email?.trim();
@@ -113,7 +132,7 @@ router.post('/signup', async (req, res) => {
       username,
       password,
       role: assignedRole,
-      departments: departments || [],
+      departments: cleanDepartments || [], // ✅ USE FIXED VALUE
       email: email || '',
       isActive: true,
       isApproved,
@@ -154,7 +173,6 @@ router.post('/signup', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 
 // ================= GET USERS =================
 router.get('/users', auth, requireRole('admin', 'manager'), async (req, res) => {
