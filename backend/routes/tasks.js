@@ -178,7 +178,8 @@ router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
       return res.status(400).json({ message: 'Valid department is required' });
     }
     // ✅ normalize departments (FIX)
-const normalizedDepartments = user.departments.map(dep => {
+// ✅ SAFE NORMALIZATION (FINAL FIX)
+const normalizedDepartments = (user.departments || []).map(dep => {
   if (typeof dep === "string") {
     try {
       const parsed = JSON.parse(dep);
@@ -190,6 +191,13 @@ const normalizedDepartments = user.departments.map(dep => {
   return dep;
 });
 
+// 🔥 DEBUG LOGS (VERY IMPORTANT — CHECK RENDER LOGS)
+console.log("USER:", user.username);
+console.log("USER DEPARTMENTS RAW:", user.departments);
+console.log("NORMALIZED:", normalizedDepartments);
+console.log("REQUESTED DEPARTMENT:", department);
+
+// ✅ FINAL CHECK
 if (user.role === 'manager' && !normalizedDepartments.includes(department)) {
   return res.status(403).json({ message: 'No access to this department' });
 }
