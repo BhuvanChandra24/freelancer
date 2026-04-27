@@ -1,23 +1,31 @@
 import axios from 'axios';
 
+// ✅ FIX 1: FORCE CORRECT BASE URL (VERY IMPORTANT)
+const BASE_URL =
+  process.env.REACT_APP_API_URL?.trim() ||
+  'https://freelancer-b8cs.onrender.com/api';
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: false, // keep simple
 });
 
-// 🔥 DEBUG: Log base URL once
-console.log("🌐 API BASE URL:", process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
+// 🔥 DEBUG: Show final base URL
+console.log("🌐 API BASE URL:", BASE_URL);
 
+// ================= REQUEST INTERCEPTOR =================
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('mw_token');
 
-  // ✅ KEEP JSON HEADER (important)
-  config.headers['Content-Type'] = 'application/json';
+  // ✅ FIX 2: ENSURE BODY IS NOT LOST
+  if (config.data && typeof config.data === 'object') {
+    config.data = JSON.parse(JSON.stringify(config.data));
+  }
 
-  // ❌ REMOVE manual stringify (this was causing your issue)
-  // Axios automatically handles JSON conversion
-
-  // 🔥 DEBUG: Log every request
+  // 🔥 DEBUG: REQUEST
   console.log("🚀 REQUEST:", {
     url: config.baseURL + config.url,
     method: config.method,
@@ -25,11 +33,14 @@ api.interceptors.request.use((config) => {
     data: config.data
   });
 
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
   return config;
 });
 
+// ================= RESPONSE INTERCEPTOR =================
 api.interceptors.response.use(
   (res) => {
     console.log("📥 RESPONSE:", {
@@ -46,10 +57,12 @@ api.interceptors.response.use(
       localStorage.removeItem('mw_user');
       window.location.href = '/';
     }
+
     return Promise.reject(err);
   }
 );
 
+// ================= TASKS API =================
 export const tasksAPI = {
   getTasks: (search = '', department = '') =>
     api.get('/tasks', { params: { search, department } }),
@@ -86,11 +99,13 @@ export const tasksAPI = {
     api.get(`/tasks/schema/${department}`),
 };
 
+// ================= MIS API =================
 export const misAPI = {
   getStats: () => api.get('/mis'),
   sync: (department) => api.post('/mis/sync', { department }),
 };
 
+// ================= ADMIN API =================
 export const adminAPI = {
   getDepartments: () => api.get('/admin/departments'),
   setupHeaders: (department) => api.post(`/admin/setup-headers/${department}`),
@@ -106,12 +121,17 @@ export const adminAPI = {
     api.put(`/admin/approve/${id}`, { approve, departments }),
 };
 
+// ================= AUTH API =================
 export const authAPI = {
-  login: (username, password) =>
-    api.post('/auth/login', { username, password }),
+  login: (username, password) => {
+    console.log("🔐 AUTH LOGIN CALL:", { username });
+    return api.post('/auth/login', { username, password });
+  },
 
-  signup: (data) =>
-    api.post('/auth/signup', data),
+  signup: (data) => {
+    console.log("📝 AUTH SIGNUP CALL:", data);
+    return api.post('/auth/signup', data);
+  },
 
   getUsers: () => api.get('/auth/users'),
   getMe: () => api.get('/auth/me'),

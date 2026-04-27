@@ -35,30 +35,84 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // ================= LOGIN =================
   const login = useCallback(async (username, password) => {
-    const res = await api.post('/auth/login', { username, password });
+    // ✅ FIX 1: SAFE VALUES
+    const safeUsername = (username || "").trim();
+    const safePassword = (password || "").trim();
 
-    const { token: t, user: u } = res.data;
+    // ✅ FIX 2: PREVENT EMPTY REQUEST
+    if (!safeUsername || !safePassword) {
+      console.error("❌ LOGIN BLOCKED: Missing username/password");
+      throw new Error("Username and password required");
+    }
 
-    localStorage.setItem('mw_token', t);
-    localStorage.setItem('mw_user', JSON.stringify(u));
+    try {
+      console.log("🚀 LOGIN PAYLOAD:", {
+        username: safeUsername,
+        password: safePassword ? "****" : null
+      });
 
-    setToken(t);
-    setUser(u);
-    setAuthHeader(t);
+      const res = await api.post('/auth/login', {
+        username: safeUsername,
+        password: safePassword
+      });
 
-    console.log(`✅ [AuthContext] Login success: "${u.username}" role="${u.role}"`);
+      const { token: t, user: u } = res.data;
 
-    return u;
+      localStorage.setItem('mw_token', t);
+      localStorage.setItem('mw_user', JSON.stringify(u));
+
+      setToken(t);
+      setUser(u);
+      setAuthHeader(t);
+
+      console.log(`✅ [AuthContext] Login success: "${u.username}" role="${u.role}"`);
+
+      return u;
+
+    } catch (err) {
+      console.error("❌ LOGIN ERROR:", err?.response?.data || err.message);
+      throw err;
+    }
+
   }, []);
 
-  // FEATURE: Manager Approval System
-  // signup now returns the full response data so the caller can detect pendingApproval
+  // ================= SIGNUP =================
   const signup = useCallback(async (data) => {
-    const res = await api.post('/auth/signup', data);
-    return res.data; // includes { pendingApproval: true } for managers
+    // ✅ FIX 3: SAFE DATA HANDLING
+    const safeData = {
+      username: (data.username || "").trim(),
+      password: (data.password || "").trim(),
+      email: (data.email || "").trim(),
+      role: data.role,
+      departments: data.departments || []
+    };
+
+    // ✅ FIX 4: PREVENT EMPTY REQUEST
+    if (!safeData.username || !safeData.password) {
+      console.error("❌ SIGNUP BLOCKED: Missing username/password");
+      throw new Error("Username and password required");
+    }
+
+    try {
+      console.log("🚀 SIGNUP PAYLOAD:", {
+        ...safeData,
+        password: safeData.password ? "****" : null
+      });
+
+      const res = await api.post('/auth/signup', safeData);
+
+      return res.data;
+
+    } catch (err) {
+      console.error("❌ SIGNUP ERROR:", err?.response?.data || err.message);
+      throw err;
+    }
+
   }, []);
 
+  // ================= LOGOUT =================
   const logout = useCallback(() => {
     localStorage.removeItem('mw_token');
     localStorage.removeItem('mw_user');
