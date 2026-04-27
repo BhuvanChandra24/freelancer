@@ -83,9 +83,28 @@ router.post('/signup', async (req, res) => {
     let email = body.email;
 
     // 🔥 SUPPORT BOTH department & departments (IMPORTANT FIX)
-    let departments =
-      body.departments ||
-      (body.department ? [body.department] : []);
+   let departments = [];
+
+if (Array.isArray(body.departments)) {
+  departments = body.departments;
+} else if (typeof body.departments === "string") {
+  try {
+    const parsed = JSON.parse(body.departments);
+    departments = Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    departments = [body.departments];
+  }
+} else if (body.department) {
+  departments = [body.department];
+}
+
+// clean values
+departments = departments.map(d => (d || "").trim());
+
+// ✅ AUTO FIX FOR MANAGER
+if ((role || 'employee') === 'manager' && departments.length === 0) {
+  departments = ['CRM']; // default department
+}
 
     // ✅ ================= NEW FIX ADDED =================
     // Normalize departments (handles wrong formats like '["CRM"]')
