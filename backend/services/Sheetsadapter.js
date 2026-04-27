@@ -7,35 +7,45 @@
  * ============================================================
  */
 
+/**
+ * Google Sheets Adapter
+ * ============================================================
+ */
+
 const { google } = require('googleapis');
 const NodeCache = require('node-cache');
 const { DEPARTMENTS, colLetterToIndex, indexToColLetter } = require('../config/Sheetsmapping');
 
-// Initialize cache: TTL from env, default 5 minutes
+// ✅ MUST BE GLOBAL (FIXES ERROR)
+let sheetsClient = null;
+
+// Initialize cache
 const cache = new NodeCache({
   stdTTL: parseInt(process.env.CACHE_TTL || '300'),
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
 
+/**
+ * Initialize Google Sheets client using service account
+ */
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   let credentials;
 
-  // ✅ NEW: Support GOOGLE_SERVICE_ACCOUNT_KEY (Render ENV)
+  // ✅ NEW: Render ENV support
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 
-    // 🔥 FIX: private key newline issue
+    // 🔥 IMPORTANT FIX (newline issue)
     credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
   }
 
-  // Existing Option 1 (kept as-is)
+  // Existing support (kept)
   else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   }
 
-  // Existing Option 2 (kept as-is)
   else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
     credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
   }
@@ -51,8 +61,11 @@ async function getSheetsClient() {
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
+  // ✅ CREATE CLIENT
   sheetsClient = google.sheets({ version: 'v4', auth });
+
   console.log('✅ Google Sheets client initialized');
+
   return sheetsClient;
 }
 
