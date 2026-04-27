@@ -17,26 +17,32 @@ const cache = new NodeCache({
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
 
-let sheetsClient = null;
-
-/**
- * Initialize Google Sheets client using service account
- */
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   let credentials;
 
-  // Option 1: JSON env variable (for hosting)
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  // ✅ NEW: Support GOOGLE_SERVICE_ACCOUNT_KEY (Render ENV)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+
+    // 🔥 FIX: private key newline issue
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
+  // Existing Option 1 (kept as-is)
+  else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   }
-  // Option 2: Key file path
+
+  // Existing Option 2 (kept as-is)
   else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
     credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
-  } else {
+  }
+
+  else {
     throw new Error(
-      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE in .env'
+      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE in .env'
     );
   }
 
