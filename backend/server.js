@@ -22,7 +22,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/mis', require('./routes/mis'));
 app.use('/api/admin', require('./routes/admin'));
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({

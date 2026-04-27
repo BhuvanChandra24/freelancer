@@ -17,7 +17,11 @@ router.post('/login', async (req, res) => {
   try {
     console.log("🔐 LOGIN BODY:", req.body);
 
-    const { username, password } = req.body;
+    // 🔥 SAFE BODY HANDLING (ADDED)
+    const body = req.body || {};
+
+    const username = body.username;
+    const password = body.password;
 
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password required' });
@@ -35,8 +39,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // FEATURE: Manager Approval System
-    // Block managers who have not been approved by admin yet
     if (user.role === 'manager' && !user.isApproved) {
       console.log("⏳ MANAGER NOT APPROVED:", user.username);
       return res.status(403).json({
@@ -72,7 +74,18 @@ router.post('/signup', async (req, res) => {
   try {
     console.log("🟡 SIGNUP BODY:", req.body);
 
-    let { username, password, role, departments, email } = req.body;
+    // 🔥 SAFE BODY HANDLING (FIX)
+    const body = req.body || {};
+
+    let username = body.username;
+    let password = body.password;
+    let role = body.role;
+    let email = body.email;
+
+    // 🔥 SUPPORT BOTH department & departments (IMPORTANT FIX)
+    let departments =
+      body.departments ||
+      (body.department ? [body.department] : []);
 
     username = username?.trim();
     password = password?.trim();
@@ -94,9 +107,6 @@ router.post('/signup', async (req, res) => {
 
     const assignedRole = role || 'employee';
 
-    // FEATURE: Manager Approval System
-    // Managers are created with isApproved: false and must be approved by admin
-    // Employees and admins are auto-approved (isApproved: true)
     const isApproved = assignedRole !== 'manager';
 
     const newUser = new User({
@@ -113,8 +123,6 @@ router.post('/signup', async (req, res) => {
 
     console.log(`✅ USER CREATED: ${newUser.username} (role=${assignedRole}, approved=${isApproved})`);
 
-    // FEATURE: Manager Approval System
-    // Do NOT issue a token for unapproved managers — they must wait for admin approval
     if (assignedRole === 'manager') {
       return res.status(201).json({
         message: 'Manager account created. Your account is pending admin approval before you can log in.',
@@ -148,7 +156,7 @@ router.post('/signup', async (req, res) => {
 });
 
 
-// ================= GET USERS (for task assignment dropdowns) =================
+// ================= GET USERS =================
 router.get('/users', auth, requireRole('admin', 'manager'), async (req, res) => {
   try {
     const users = await User.find({ isActive: true }, '-password').sort({ username: 1 });

@@ -11,13 +11,11 @@ console.log("🌐 API BASE URL:", process.env.REACT_APP_API_URL || 'http://local
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('mw_token');
 
-  // 🔥 ADD: FORCE JSON HEADER (VERY IMPORTANT FIX)
+  // ✅ KEEP JSON HEADER (important)
   config.headers['Content-Type'] = 'application/json';
 
-  // 🔥 ADD: Ensure data is properly stringified for POST/PUT
-  if (config.data && typeof config.data === 'object') {
-    config.data = JSON.stringify(config.data);
-  }
+  // ❌ REMOVE manual stringify (this was causing your issue)
+  // Axios automatically handles JSON conversion
 
   // 🔥 DEBUG: Log every request
   console.log("🚀 REQUEST:", {
@@ -28,12 +26,12 @@ api.interceptors.request.use((config) => {
   });
 
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
   return config;
 });
 
 api.interceptors.response.use(
   (res) => {
-    // 🔥 DEBUG: Log every response
     console.log("📥 RESPONSE:", {
       url: res.config.url,
       data: res.data
@@ -41,7 +39,6 @@ api.interceptors.response.use(
     return res;
   },
   (err) => {
-    // 🔥 DEBUG: Log errors
     console.error("❌ API ERROR:", err?.response || err);
 
     if (err?.response?.status === 401) {
@@ -57,7 +54,6 @@ export const tasksAPI = {
   getTasks: (search = '', department = '') =>
     api.get('/tasks', { params: { search, department } }),
 
-  // 🔥 DEBUG VERSION (ADDED — DOES NOT REPLACE ORIGINAL)
   debugGetTasks: async (search = '', department = '') => {
     console.log("🧪 DEBUG getTasks CALLED");
     console.log("📤 Params:", { search, department });
@@ -66,7 +62,6 @@ export const tasksAPI = {
 
     console.log("📥 RAW DATA:", res.data);
 
-    // 🔥 Show structure clearly
     if (Array.isArray(res.data)) {
       console.log("✅ Data is ARRAY with length:", res.data.length);
     } else {
@@ -103,7 +98,6 @@ export const adminAPI = {
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   getStatus: () => api.get('/admin/status'),
 
-  // 🔥 ADD THESE (DO NOT REMOVE ABOVE)
   getStats: () => api.get('/admin/stats'),
   getManagers: () => api.get('/admin/managers'),
   getEmployees: () => api.get('/admin/employees'),
@@ -113,8 +107,12 @@ export const adminAPI = {
 };
 
 export const authAPI = {
-  login: (username, password) => api.post('/auth/login', { username, password }),
-  signup: (data) => api.post('/auth/signup', data),
+  login: (username, password) =>
+    api.post('/auth/login', { username, password }),
+
+  signup: (data) =>
+    api.post('/auth/signup', data),
+
   getUsers: () => api.get('/auth/users'),
   getMe: () => api.get('/auth/me'),
 };
