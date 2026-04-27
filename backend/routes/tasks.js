@@ -177,9 +177,22 @@ router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
     if (!department || !DEPARTMENTS[department]) {
       return res.status(400).json({ message: 'Valid department is required' });
     }
-    if (user.role === 'manager' && !user.departments.includes(department)) {
-      return res.status(403).json({ message: 'No access to this department' });
+    // ✅ normalize departments (FIX)
+const normalizedDepartments = user.departments.map(dep => {
+  if (typeof dep === "string") {
+    try {
+      const parsed = JSON.parse(dep);
+      return Array.isArray(parsed) ? parsed[0].trim() : dep.trim();
+    } catch {
+      return dep.trim();
     }
+  }
+  return dep;
+});
+
+if (user.role === 'manager' && !normalizedDepartments.includes(department)) {
+  return res.status(403).json({ message: 'No access to this department' });
+}
     if (!fields.title || !fields.assignedTo || !fields.deadline) {
       return res.status(400).json({ message: 'title, assignedTo, and deadline are required' });
     }
