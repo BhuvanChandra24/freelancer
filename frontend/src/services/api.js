@@ -50,7 +50,12 @@ api.interceptors.response.use(
     return res;
   },
   (err) => {
-    console.error("❌ API ERROR:", err?.response || err);
+    console.error("❌ API ERROR DETAILS:", {
+      url: err?.config?.url,
+      status: err?.response?.status,
+      message: err?.response?.data?.message,
+      data: err?.response?.data,
+    });
 
     if (err?.response?.status === 401) {
       localStorage.removeItem('mw_token');
