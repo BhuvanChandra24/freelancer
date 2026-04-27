@@ -198,7 +198,12 @@ console.log("NORMALIZED:", normalizedDepartments);
 console.log("REQUESTED DEPARTMENT:", department);
 
 // ✅ FINAL CHECK
-if (user.role === 'manager' && !normalizedDepartments.includes(department)) {
+// ✅ FINAL SAFE CHECK (ALLOW IF DEPARTMENTS EMPTY OR MATCH)
+if (
+  user.role === 'manager' &&
+  normalizedDepartments.length > 0 &&
+  !normalizedDepartments.includes(department)
+) {
   return res.status(403).json({ message: 'No access to this department' });
 }
     if (!fields.title || !fields.assignedTo || !fields.deadline) {
