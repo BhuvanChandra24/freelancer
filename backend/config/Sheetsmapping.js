@@ -159,7 +159,7 @@ const DEPARTMENTS = {
     },
     columns: {
       A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
-      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
+      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
       C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       E: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
