@@ -177,41 +177,48 @@ router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
     if (!department || !DEPARTMENTS[department]) {
       return res.status(400).json({ message: 'Valid department is required' });
     }
-    // ✅ normalize departments (FIX)
-// ✅ SAFE NORMALIZATION (FINAL FIX)
-const normalizedDepartments = (user.departments || []).map(dep => {
-  if (typeof dep === "string") {
-    try {
-      const parsed = JSON.parse(dep);
-      return Array.isArray(parsed) ? parsed[0].trim() : dep.trim();
-    } catch {
-      return dep.trim();
+
+    // ✅ Normalize department (IMPORTANT FIX)
+    const normalizedDepartment = department.trim().toUpperCase();
+
+    // ✅ Normalize user departments (FIXED)
+    const normalizedDepartments = (user.departments || []).map(dep => {
+      if (typeof dep === "string") {
+        try {
+          const parsed = JSON.parse(dep);
+          return Array.isArray(parsed)
+            ? parsed[0].trim().toUpperCase()
+            : dep.trim().toUpperCase();
+        } catch {
+          return dep.trim().toUpperCase();
+        }
+      }
+      return dep;
+    });
+
+    // 🔥 DEBUG LOGS (keep them)
+    console.log("USER:", user.username);
+    console.log("USER DEPARTMENTS RAW:", user.departments);
+    console.log("NORMALIZED:", normalizedDepartments);
+    console.log("REQUESTED DEPARTMENT:", normalizedDepartment);
+
+    // ✅ FINAL SAFE CHECK (FIXED)
+    if (
+      user.role === 'manager' &&
+      normalizedDepartments.length > 0 &&
+      !normalizedDepartments.includes(normalizedDepartment)
+    ) {
+      return res.status(403).json({ message: 'No access to this department' });
     }
-  }
-  return dep;
-});
 
-// 🔥 DEBUG LOGS (VERY IMPORTANT — CHECK RENDER LOGS)
-console.log("USER:", user.username);
-console.log("USER DEPARTMENTS RAW:", user.departments);
-console.log("NORMALIZED:", normalizedDepartments);
-console.log("REQUESTED DEPARTMENT:", department);
-
-// ✅ FINAL CHECK
-// ✅ FINAL SAFE CHECK (ALLOW IF DEPARTMENTS EMPTY OR MATCH)
-if (
-  user.role === 'manager' &&
-  normalizedDepartments.length > 0 &&
-  !normalizedDepartments.includes(department)
-) {
-  return res.status(403).json({ message: 'No access to this department' });
-}
+    // ✅ Required fields validation
     if (!fields.title || !fields.assignedTo || !fields.deadline) {
       return res.status(400).json({ message: 'title, assignedTo, and deadline are required' });
     }
 
     const normalizedAssignedTo = (fields.assignedTo || '').trim();
-    const taskId = `TASK-${department.substring(0, 3).toUpperCase()}-${Date.now()}`;
+
+    const taskId = `TASK-${normalizedDepartment.substring(0, 3)}-${Date.now()}`;
     const now = new Date().toISOString().split('T')[0];
 
     const taskData = {
@@ -225,18 +232,23 @@ if (
       completedAt: '',
     };
 
-    console.log(`📝 [POST /tasks] Creating task "${taskData.id}" in dept "${department}" assigned to "${normalizedAssignedTo}" by "${user.username}"`);
+    console.log(`📝 Creating task "${taskData.id}" in "${normalizedDepartment}"`);
 
-    await appendTask(department, taskData);
+    // ✅ Use normalized department
+    await appendTask(normalizedDepartment, taskData);
 
-    console.log(`✅ [POST /tasks] Task created successfully: ${taskData.id}`);
+    console.log(`✅ Task created successfully: ${taskData.id}`);
 
     res.status(201).json({
       message: 'Task created successfully',
-      task: { ...taskData, _department: department, deadlineStatus: getDeadlineStatus(fields.deadline) },
+      task: {
+        ...taskData,
+        _department: normalizedDepartment,
+      },
     });
+
   } catch (err) {
-    console.error('❌ [POST /tasks] Error:', err.message);
+    console.error('❌ Error creating task:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
