@@ -396,14 +396,27 @@ router.delete('/:department/:rowIndex', auth, requireRole('manager', 'admin'), a
 // ─── GET /api/tasks/schema/:department ────────────────────────────────────────
 router.get('/schema/:department', auth, (req, res) => {
   const { department } = req.params;
-  const deptConfig = DEPARTMENTS[department];
-  if (!deptConfig) return res.status(404).json({ message: 'Department not found' });
 
-  const visibleCols = getVisibleColumns(department, req.user.role);
-  const editableCols = getEditableColumns(department, req.user.role);
+  // ✅ normalize department
+  const normalizedDepartment = department.trim().toUpperCase();
+
+  const deptConfig = DEPARTMENTS[normalizedDepartment];
+  if (!deptConfig) {
+    return res.status(404).json({ message: 'Department not found' });
+  }
+
+  const role = req.user.role;
+
+  const visibleCols = getVisibleColumns(normalizedDepartment, role);
+  const editableCols = getEditableColumns(normalizedDepartment, role);
+
+  // ✅ IMPORTANT FIX
+  if (!visibleCols || Object.keys(visibleCols).length === 0) {
+    return res.status(403).json({ message: 'No access to this department' });
+  }
 
   res.json({
-    department,
+    department: normalizedDepartment,
     fields: Object.values(visibleCols).map(f => ({
       ...f,
       editable: editableCols.includes(f.key),
