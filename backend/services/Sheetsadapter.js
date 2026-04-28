@@ -17,43 +17,52 @@ const cache = new NodeCache({
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
 
-let sheetsClient = null;
 
 /**
  * Initialize Google Sheets client using service account
  */
+let sheetsClient = null;
+
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
-  let credentials;
+  try {
+    // ✅ Read credentials from ENV
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
-  // Option 1: JSON env variable (for hosting)
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    if (!raw) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set in environment');
+    }
+
+    // ✅ Parse JSON safely
+    const credentials = JSON.parse(raw);
+
+    // ✅ Fix private key formatting (VERY IMPORTANT)
+    if (credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
+    // ✅ Initialize auth
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    // ✅ Create sheets client
+    sheetsClient = google.sheets({
+      version: 'v4',
+      auth,
+    });
+
+    console.log('✅ Google Sheets client initialized');
+
+    return sheetsClient;
+
+  } catch (error) {
+    console.error('❌ Google Sheets init error:', error.message);
+    throw new Error('Failed to initialize Google Sheets client');
   }
-  // Option 2: Key file path
-  else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
-    credentials = require(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE);
-  } else {
-    throw new Error(
-      'Google service account credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE in .env'
-    );
-  }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-
-  sheetsClient = google.sheets({ version: 'v4', auth });
-  console.log('✅ Google Sheets client initialized');
-  return sheetsClient;
 }
-
-/**
- * Read all rows from a department's task sheet
- * Returns array of task objects (mapped using columns config)
- */
 async function readDepartmentTasks(department) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
