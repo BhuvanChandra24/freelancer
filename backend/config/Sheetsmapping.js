@@ -25,24 +25,38 @@ const DEPARTMENTS = {
         range: 'A1:P',
       },
     },
-    // Column letter → field key mapping (matches your actual sheet columns)
     columns: {
       A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
-      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      E: { key: 'assignedEmail', label: 'Assigned Email', type: 'email', required: false, visibleTo: ['manager', 'admin'], editableBy: ['manager', 'admin'] },
-      F: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      G: { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      H: { key: 'deadline', label: 'Deadline', type: 'date', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      I: { key: 'createdAt', label: 'Created At', type: 'date', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
-      J: { key: 'createdBy', label: 'Created By', type: 'text', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
-      K: { key: 'customerName', label: 'Customer Name', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      L: { key: 'contactNumber', label: 'Contact Number', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      M: { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['Website', 'Referral', 'Cold Call', 'Exhibition', 'Other'], required: false, visibleTo: ['manager', 'admin'], editableBy: ['manager', 'admin'] },
-      N: { key: 'followUpDate', label: 'Follow Up Date', type: 'date', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      O: { key: 'notes', label: 'Notes', type: 'textarea', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      P: { key: 'completedAt', label: 'Completed At', type: 'date', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
+
+      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      E: { key: 'assignedEmail', label: 'Assigned Email', type: 'email', required: false, visibleTo: ['manager','admin'], editableBy: ['manager','admin'] },
+
+      F: { key: 'status', label: 'Status', type: 'select', options: ['Pending','In Progress','Completed','On Hold'], required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','employee','admin'] },
+
+      G: { key: 'priority', label: 'Priority', type: 'select', options: ['Low','Medium','High','Critical'], required: true, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      H: { key: 'deadline', label: 'Deadline', type: 'date', required: true, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      I: { key: 'createdAt', label: 'Created At', type: 'date', required: false, visibleTo: ['manager','admin'], editableBy: [] },
+
+      J: { key: 'createdBy', label: 'Created By', type: 'text', required: false, visibleTo: ['manager','admin'], editableBy: [] },
+
+      K: { key: 'customerName', label: 'Customer Name', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      L: { key: 'contactNumber', label: 'Contact Number', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      M: { key: 'leadSource', label: 'Lead Source', type: 'select', options: ['Website','Referral','Cold Call','Exhibition','Other'], required: false, visibleTo: ['manager','admin'], editableBy: ['manager','admin'] },
+
+      N: { key: 'followUpDate', label: 'Follow Up Date', type: 'date', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      O: { key: 'notes', label: 'Notes', type: 'textarea', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      P: { key: 'completedAt', label: 'Completed At', type: 'date', required: false, visibleTo: ['manager','admin'], editableBy: [] },
     },
   },
 
@@ -60,23 +74,39 @@ const DEPARTMENTS = {
       },
     },
     columns: {
-      A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
-      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      E: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      F: { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      G: { key: 'deadline', label: 'Deadline', type: 'date', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      H: { key: 'createdAt', label: 'Created At', type: 'date', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
-      I: { key: 'createdBy', label: 'Created By', type: 'text', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
-      J: { key: 'workOrderNumber', label: 'Work Order #', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      K: { key: 'productName', label: 'Product Name', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      L: { key: 'quantity', label: 'Quantity', type: 'number', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      M: { key: 'unit', label: 'Unit', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      N: { key: 'machineId', label: 'Machine ID', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      O: { key: 'qualityCheck', label: 'Quality Check', type: 'select', options: ['Pending', 'Pass', 'Fail', 'Rework'], required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      P: { key: 'notes', label: 'Notes', type: 'textarea', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
-      Q: { key: 'completedAt', label: 'Completed At', type: 'date', required: false, visibleTo: ['manager', 'admin'], editableBy: [] },
+      A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager','admin'], editableBy: [] },
+
+      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','admin'] },
+
+      E: { key: 'status', label: 'Status', type: 'select', options: ['Pending','In Progress','Completed','On Hold'], required: true, visibleTo: ['manager','employee','admin','user'], editableBy: ['manager','employee','admin'] },
+
+      F: { key: 'priority', label: 'Priority', type: 'select', options: ['Low','Medium','High','Critical'], required: true, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      G: { key: 'deadline', label: 'Deadline', type: 'date', required: true, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      H: { key: 'createdAt', label: 'Created At', type: 'date', required: false, visibleTo: ['manager','admin'], editableBy: [] },
+
+      I: { key: 'createdBy', label: 'Created By', type: 'text', required: false, visibleTo: ['manager','admin'], editableBy: [] },
+
+      J: { key: 'workOrderNumber', label: 'Work Order #', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      K: { key: 'productName', label: 'Product Name', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      L: { key: 'quantity', label: 'Quantity', type: 'number', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      M: { key: 'unit', label: 'Unit', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      N: { key: 'machineId', label: 'Machine ID', type: 'text', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','admin'] },
+
+      O: { key: 'qualityCheck', label: 'Quality Check', type: 'select', options: ['Pending','Pass','Fail','Rework'], required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      P: { key: 'notes', label: 'Notes', type: 'textarea', required: false, visibleTo: ['manager','employee','admin'], editableBy: ['manager','employee','admin'] },
+
+      Q: { key: 'completedAt', label: 'Completed At', type: 'date', required: false, visibleTo: ['manager','admin'], editableBy: [] },
     },
   },
 
@@ -95,7 +125,7 @@ const DEPARTMENTS = {
     },
     columns: {
       A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
-      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
+      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
       C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       E: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
@@ -126,7 +156,7 @@ const DEPARTMENTS = {
     },
     columns: {
       A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
-      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
+      B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
       C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       E: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
@@ -160,8 +190,8 @@ const DEPARTMENTS = {
     columns: {
       A: { key: 'id', label: 'Task ID', type: 'text', required: true, visibleTo: ['manager', 'admin'], editableBy: [] },
       B: { key: 'title', label: 'Task Title', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
-      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
-      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
+      C: { key: 'description', label: 'Description', type: 'text', required: false, visibleTo: ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
+      D: { key: 'assignedTo', label: 'Assigned To', type: 'text', required: true, visibleTo:  ['manager', 'employee', 'admin', 'user'], editableBy: ['manager', 'admin'] },
       E: { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Progress', 'Completed', 'On Hold'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'employee', 'admin'] },
       F: { key: 'priority', label: 'Priority', type: 'select', options: ['Low', 'Medium', 'High', 'Critical'], required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
       G: { key: 'deadline', label: 'Deadline', type: 'date', required: true, visibleTo: ['manager', 'employee', 'admin'], editableBy: ['manager', 'admin'] },
