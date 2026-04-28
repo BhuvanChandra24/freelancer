@@ -27,28 +27,40 @@ async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   try {
-    // ✅ Read credentials from ENV
     const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
     if (!raw) {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set in environment');
+      throw new Error('❌ GOOGLE_SERVICE_ACCOUNT_JSON is missing');
     }
 
-    // ✅ Parse JSON safely
-    const credentials = JSON.parse(raw);
+    let credentials;
 
-    // ✅ Fix private key formatting (VERY IMPORTANT)
-    if (credentials.private_key) {
-      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    try {
+      credentials = JSON.parse(raw);
+    } catch (err) {
+      console.error("❌ JSON PARSE ERROR:", err.message);
+      throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_JSON format");
     }
 
-    // ✅ Initialize auth
+    // 🔥 VERY IMPORTANT FIX (handles all cases)
+    if (!credentials.private_key) {
+      throw new Error("❌ private_key missing in credentials");
+    }
+
+    // Normalize key (fixes JWT signature issue)
+    credentials.private_key = credentials.private_key
+      .replace(/\\n/g, '\n')
+      .replace(/\r/g, '');
+
+    // Debug (safe)
+    console.log("🔑 Client Email:", credentials.client_email);
+    console.log("🔑 Private Key starts with:", credentials.private_key.slice(0, 30));
+
     const auth = new google.auth.GoogleAuth({
       credentials,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
-    // ✅ Create sheets client
     sheetsClient = google.sheets({
       version: 'v4',
       auth,
