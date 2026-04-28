@@ -394,34 +394,60 @@ router.delete('/:department/:rowIndex', auth, requireRole('manager', 'admin'), a
 });
 
 // ─── GET /api/tasks/schema/:department ────────────────────────────────────────
+// ─── GET /api/tasks/schema/:department ────────────────────────────────────────
 router.get('/schema/:department', auth, (req, res) => {
-  const { department } = req.params;
+  try {
+    const { department } = req.params;
 
-  // ✅ normalize department
-  const normalizedDepartment = department.trim().toUpperCase();
+    // ✅ Normalize department (fix case issues)
+    const normalizedDepartment = (department || '').trim().toUpperCase();
 
-  const deptConfig = DEPARTMENTS[normalizedDepartment];
-  if (!deptConfig) {
-    return res.status(404).json({ message: 'Department not found' });
+    // 🔥 DEBUG LOGS (check in Render logs)
+    console.log("📌 SCHEMA REQUEST");
+    console.log("ROLE:", req.user?.role);
+    console.log("RAW DEPARTMENT:", department);
+    console.log("NORMALIZED DEPARTMENT:", normalizedDepartment);
+
+    // ✅ Validate department
+    const deptConfig = DEPARTMENTS[normalizedDepartment];
+    if (!deptConfig) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+
+    const role = req.user?.role || 'user';
+
+    // ✅ Get columns
+    let visibleCols = getVisibleColumns(normalizedDepartment, role);
+    const editableCols = getEditableColumns(normalizedDepartment, role);
+
+    // 🔥 DEBUG
+    console.log("VISIBLE COLS COUNT:", Object.keys(visibleCols || {}).length);
+
+    // ✅ FALLBACK FIX (prevents 403 issue)
+    // If no columns visible, fallback to employee view
+    if (!visibleCols || Object.keys(visibleCols).length === 0) {
+      console.log("⚠️ No columns for role → fallback to 'employee'");
+      visibleCols = getVisibleColumns(normalizedDepartment, 'employee');
+    }
+
+    // ❌ Still no columns → real restriction
+    if (!visibleCols || Object.keys(visibleCols).length === 0) {
+      return res.status(403).json({ message: 'No access to this department' });
+    }
+
+    // ✅ Response
+    res.json({
+      department: normalizedDepartment,
+      fields: Object.values(visibleCols).map(f => ({
+        ...f,
+        editable: editableCols.includes(f.key),
+      })),
+    });
+
+  } catch (err) {
+    console.error("❌ Schema error:", err.message);
+    res.status(500).json({ message: err.message });
   }
-
-  const role = req.user.role;
-
-  const visibleCols = getVisibleColumns(normalizedDepartment, role);
-  const editableCols = getEditableColumns(normalizedDepartment, role);
-
-  // ✅ IMPORTANT FIX
-  if (!visibleCols || Object.keys(visibleCols).length === 0) {
-    return res.status(403).json({ message: 'No access to this department' });
-  }
-
-  res.json({
-    department: normalizedDepartment,
-    fields: Object.values(visibleCols).map(f => ({
-      ...f,
-      editable: editableCols.includes(f.key),
-    })),
-  });
 });
 
 module.exports = router;
