@@ -1,14 +1,11 @@
 /**
- * Google Sheets Adapter
- * ============================================================
- * FIXED VERSION (NO JWT ERROR)
- * Uses FILE-BASED service account authentication
- * ============================================================
+ * Google Sheets Adapter (FINAL WORKING VERSION)
  */
 
 const { google } = require('googleapis');
 const NodeCache = require('node-cache');
 const path = require('path');
+const fs = require('fs');
 
 const { DEPARTMENTS, colLetterToIndex, indexToColLetter } = require('../config/Sheetsmapping');
 
@@ -18,28 +15,49 @@ const cache = new NodeCache({
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
 
-
-// ───────── GOOGLE CLIENT ─────────
 let sheetsClient = null;
 
+// ───────── AUTH (FINAL FIX) ─────────
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   try {
-    // ✅ FIX: USE FILE INSTEAD OF ENV
-    const credentials = require(path.join(__dirname, '../config/service-account.json'));
+    let credentials;
 
-    if (!credentials.private_key || !credentials.client_email) {
-      throw new Error('❌ Invalid service account file');
+    const filePath = path.join(__dirname, '../config/service-account.json');
+
+    console.log("📁 Checking service account file...");
+    console.log("📁 Path:", filePath);
+
+    // ✅ PRIORITY 1 → FILE (BEST)
+    if (fs.existsSync(filePath)) {
+      console.log("✅ Using FILE-based credentials");
+      credentials = require(filePath);
     }
 
-    // ✅ FIX NEWLINE ISSUE
+    // ✅ PRIORITY 2 → ENV (FALLBACK)
+    else if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      console.log("⚠️ Using ENV-based credentials");
+
+      credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    }
+
+    else {
+      throw new Error("No credentials found (file + env both missing)");
+    }
+
+    // ✅ VALIDATION
+    if (!credentials.private_key || !credentials.client_email) {
+      throw new Error("Invalid credentials format");
+    }
+
+    // ✅ FIX PRIVATE KEY
     const privateKey = credentials.private_key
       .replace(/\\n/g, '\n')
       .replace(/\r/g, '')
       .trim();
 
-    console.log("🔑 Using Service Account:", credentials.client_email);
+    console.log("🔑 Service Account:", credentials.client_email);
 
     const auth = new google.auth.JWT(
       credentials.client_email,
@@ -53,87 +71,64 @@ async function getSheetsClient() {
       auth,
     });
 
-    console.log('✅ Google Sheets client initialized');
+    console.log("✅ Google Sheets connected");
 
     return sheetsClient;
 
   } catch (error) {
-    console.error('❌ Google Sheets init error:', error.message);
-    throw new Error('Failed to initialize Google Sheets client');
+    console.error("❌ FULL ERROR:", error);
+    throw new Error("Failed to initialize Google Sheets client");
   }
 }
-
 
 // ───────── READ ─────────
 async function readDepartmentTasks(department) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
 
-  const spreadsheetId = deptConfig.spreadsheetId;
-  if (!spreadsheetId) {
-    throw new Error(`No spreadsheet ID configured for department: ${department}`);
-  }
-
-  const tab = deptConfig.tabs.tasks;
   const cacheKey = `tasks_${department}`;
-
   const cached = cache.get(cacheKey);
-  if (cached) {
-    console.log(`📦 Cache hit: ${cacheKey}`);
-    return cached;
-  }
+  if (cached) return cached;
 
   const sheets = await getSheetsClient();
-  const range = `'${tab.sheetName}'!${tab.range}`;
 
-  try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-    });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: deptConfig.spreadsheetId,
+    range: `'${deptConfig.tabs.tasks.sheetName}'!${deptConfig.tabs.tasks.range}`,
+  });
 
-    const rows = response.data.values || [];
-    if (rows.length === 0) return [];
+  const rows = res.data.values || [];
+  if (rows.length === 0) return [];
 
-    const dataRows = rows.slice(tab.dataStartRow - 1);
+  const dataRows = rows.slice(deptConfig.tabs.tasks.dataStartRow - 1);
 
-    const columnKeys = Object.entries(deptConfig.columns).reduce((acc, [letter, def]) => {
-      acc[colLetterToIndex(letter)] = def.key;
-      return acc;
-    }, {});
+  const columnKeys = Object.entries(deptConfig.columns).reduce((acc, [letter, def]) => {
+    acc[colLetterToIndex(letter)] = def.key;
+    return acc;
+  }, {});
 
-    const tasks = dataRows
-      .filter(row => row && row.length > 0 && row[0])
-      .map((row, rowIndex) => {
-        const task = {
-          _rowIndex: rowIndex + tab.dataStartRow,
-          _department: department,
-        };
+  const tasks = dataRows
+    .filter(row => row && row.length && row[0])
+    .map((row, i) => {
+      const task = {
+        _rowIndex: i + deptConfig.tabs.tasks.dataStartRow,
+        _department: department,
+      };
 
-        Object.entries(columnKeys).forEach(([idx, key]) => {
-          task[key] = row[parseInt(idx)] || '';
-        });
-
-        return task;
+      Object.entries(columnKeys).forEach(([idx, key]) => {
+        task[key] = row[idx] || '';
       });
 
-    cache.set(cacheKey, tasks);
-    return tasks;
+      return task;
+    });
 
-  } catch (err) {
-    console.error(`❌ Error reading ${department} sheet:`, err.message);
-    throw new Error(`Failed to read ${department} data: ${err.message}`);
-  }
+  cache.set(cacheKey, tasks);
+  return tasks;
 }
-
 
 // ───────── APPEND ─────────
 async function appendTask(department, taskData) {
   const deptConfig = DEPARTMENTS[department];
-  if (!deptConfig) throw new Error(`Unknown department: ${department}`);
-
-  const spreadsheetId = deptConfig.spreadsheetId;
-  const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
 
   const totalCols = Object.keys(deptConfig.columns).length;
@@ -141,97 +136,65 @@ async function appendTask(department, taskData) {
 
   Object.entries(deptConfig.columns).forEach(([letter, def]) => {
     const idx = colLetterToIndex(letter);
-    row[idx] = taskData[def.key] !== undefined ? String(taskData[def.key]) : '';
+    row[idx] = taskData[def.key] || '';
   });
 
-  try {
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `'${tab.sheetName}'!A:A`,
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [row] },
-    });
+  const res = await sheets.spreadsheets.values.append({
+    spreadsheetId: deptConfig.spreadsheetId,
+    range: `'${deptConfig.tabs.tasks.sheetName}'!A:A`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [row] },
+  });
 
-    cache.del(`tasks_${department}`);
+  cache.del(`tasks_${department}`);
 
-    return {
-      success: true,
-      updatedRange: response.data.updates?.updatedRange,
-    };
-
-  } catch (err) {
-    console.error(`❌ Append error:`, err.message);
-    throw new Error(`Failed to write task: ${err.message}`);
-  }
+  return {
+    success: true,
+    updatedRange: res.data.updates?.updatedRange,
+  };
 }
 
-
 // ───────── UPDATE ─────────
-async function updateTaskRow(department, rowIndex, updatedFields) {
+async function updateTaskRow(department, rowIndex, updates) {
   const deptConfig = DEPARTMENTS[department];
-  if (!deptConfig) throw new Error(`Unknown department: ${department}`);
-
-  const spreadsheetId = deptConfig.spreadsheetId;
-  const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
 
   const data = [];
 
   Object.entries(deptConfig.columns).forEach(([letter, def]) => {
-    if (updatedFields.hasOwnProperty(def.key)) {
+    if (updates.hasOwnProperty(def.key)) {
       data.push({
-        range: `'${tab.sheetName}'!${letter}${rowIndex}`,
-        values: [[String(updatedFields[def.key])]],
+        range: `'${deptConfig.tabs.tasks.sheetName}'!${letter}${rowIndex}`,
+        values: [[updates[def.key]]],
       });
     }
   });
 
-  if (data.length === 0) return { success: true };
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: deptConfig.spreadsheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data,
+    },
+  });
 
-  try {
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        valueInputOption: 'USER_ENTERED',
-        data,
-      },
-    });
-
-    cache.del(`tasks_${department}`);
-    return { success: true };
-
-  } catch (err) {
-    throw new Error(`Failed to update: ${err.message}`);
-  }
+  cache.del(`tasks_${department}`);
 }
-
 
 // ───────── DELETE ─────────
 async function deleteTaskRow(department, rowIndex) {
   const deptConfig = DEPARTMENTS[department];
-  if (!deptConfig) throw new Error(`Unknown department: ${department}`);
-
-  const spreadsheetId = deptConfig.spreadsheetId;
-  const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
 
   const lastCol = indexToColLetter(Object.keys(deptConfig.columns).length - 1);
 
-  try {
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId,
-      range: `'${tab.sheetName}'!A${rowIndex}:${lastCol}${rowIndex}`,
-    });
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: deptConfig.spreadsheetId,
+    range: `'${deptConfig.tabs.tasks.sheetName}'!A${rowIndex}:${lastCol}${rowIndex}`,
+  });
 
-    cache.del(`tasks_${department}`);
-    return { success: true };
-
-  } catch (err) {
-    throw new Error(`Delete failed: ${err.message}`);
-  }
+  cache.del(`tasks_${department}`);
 }
-
 
 // ───────── READ ALL ─────────
 async function readAllDepartmentTasks(departments = Object.keys(DEPARTMENTS)) {
@@ -246,7 +209,6 @@ async function readAllDepartmentTasks(departments = Object.keys(DEPARTMENTS)) {
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
 }
-
 
 // ───────── EXPORT ─────────
 module.exports = {
