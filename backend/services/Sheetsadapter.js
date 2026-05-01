@@ -1,62 +1,45 @@
 /**
  * Google Sheets Adapter
  * ============================================================
- * All read and write operations to Google Sheets happen here.
- * Uses service account authentication.
- * Includes optional in-memory caching to reduce API calls.
+ * FIXED VERSION (NO JWT ERROR)
+ * Uses FILE-BASED service account authentication
  * ============================================================
  */
 
 const { google } = require('googleapis');
 const NodeCache = require('node-cache');
+const path = require('path');
+
 const { DEPARTMENTS, colLetterToIndex, indexToColLetter } = require('../config/Sheetsmapping');
 
-// Initialize cache: TTL from env, default 5 minutes
+// ───────── CACHE ─────────
 const cache = new NodeCache({
   stdTTL: parseInt(process.env.CACHE_TTL || '300'),
   checkperiod: parseInt(process.env.CACHE_CHECK_PERIOD || '60'),
 });
 
 
-/**
- * Initialize Google Sheets client using service account
- */
+// ───────── GOOGLE CLIENT ─────────
 let sheetsClient = null;
 
 async function getSheetsClient() {
   if (sheetsClient) return sheetsClient;
 
   try {
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    // ✅ FIX: USE FILE INSTEAD OF ENV
+    const credentials = require(path.join(__dirname, '../config/service-account.json'));
 
-    if (!raw) {
-      throw new Error('❌ GOOGLE_SERVICE_ACCOUNT_JSON is missing');
-    }
-
-    let credentials;
-
-    // 🔥 SAFE PARSE (handles all Render cases)
-    try {
-      credentials = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch (err) {
-      console.error("❌ JSON PARSE ERROR:", err.message);
-      throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_JSON format");
-    }
-
-    // 🔥 VALIDATION
     if (!credentials.private_key || !credentials.client_email) {
-      throw new Error("❌ Missing required credentials fields");
+      throw new Error('❌ Invalid service account file');
     }
 
-    // 🔥 CRITICAL FIX (JWT SIGNATURE FIX)
+    // ✅ FIX NEWLINE ISSUE
     const privateKey = credentials.private_key
-      .replace(/\\n/g, '\n')   // fix escaped newlines
-      .replace(/\r/g, '')      // remove carriage returns
-      .trim();                 // remove extra spaces
+      .replace(/\\n/g, '\n')
+      .replace(/\r/g, '')
+      .trim();
 
-    // 🔥 DEBUG (safe)
     console.log("🔑 Using Service Account:", credentials.client_email);
-    console.log("🔑 Key starts with:", privateKey.slice(0, 30));
 
     const auth = new google.auth.JWT(
       credentials.client_email,
@@ -70,7 +53,6 @@ async function getSheetsClient() {
       auth,
     });
 
-    console.log("ENV LOADED:", process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.slice(0, 80));
     console.log('✅ Google Sheets client initialized');
 
     return sheetsClient;
@@ -80,6 +62,9 @@ async function getSheetsClient() {
     throw new Error('Failed to initialize Google Sheets client');
   }
 }
+
+
+// ───────── READ ─────────
 async function readDepartmentTasks(department) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
@@ -92,7 +77,6 @@ async function readDepartmentTasks(department) {
   const tab = deptConfig.tabs.tasks;
   const cacheKey = `tasks_${department}`;
 
-  // Return from cache if available
   const cached = cache.get(cacheKey);
   if (cached) {
     console.log(`📦 Cache hit: ${cacheKey}`);
@@ -111,43 +95,39 @@ async function readDepartmentTasks(department) {
     const rows = response.data.values || [];
     if (rows.length === 0) return [];
 
-    // First row = header row (we use our column config, but we verify order)
-    const headerRow = rows[tab.headerRow - 1];
     const dataRows = rows.slice(tab.dataStartRow - 1);
 
-    // Build column index map from config
     const columnKeys = Object.entries(deptConfig.columns).reduce((acc, [letter, def]) => {
-      const idx = colLetterToIndex(letter);
-      acc[idx] = def.key;
+      acc[colLetterToIndex(letter)] = def.key;
       return acc;
     }, {});
 
-    // Map each data row to an object
     const tasks = dataRows
-      .filter(row => row && row.length > 0 && row[0]) // skip empty rows
+      .filter(row => row && row.length > 0 && row[0])
       .map((row, rowIndex) => {
         const task = {
-          _rowIndex: rowIndex + tab.dataStartRow, // 1-based sheet row number
+          _rowIndex: rowIndex + tab.dataStartRow,
           _department: department,
         };
+
         Object.entries(columnKeys).forEach(([idx, key]) => {
           task[key] = row[parseInt(idx)] || '';
         });
+
         return task;
       });
 
-    // Cache the result
     cache.set(cacheKey, tasks);
     return tasks;
+
   } catch (err) {
     console.error(`❌ Error reading ${department} sheet:`, err.message);
-    throw new Error(`Failed to read ${department} data from Google Sheets: ${err.message}`);
+    throw new Error(`Failed to read ${department} data: ${err.message}`);
   }
 }
 
-/**
- * Append a new task row to a department sheet
- */
+
+// ───────── APPEND ─────────
 async function appendTask(department, taskData) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
@@ -156,7 +136,6 @@ async function appendTask(department, taskData) {
   const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
 
-  // Build the row array in correct column order
   const totalCols = Object.keys(deptConfig.columns).length;
   const row = new Array(totalCols).fill('');
 
@@ -165,33 +144,30 @@ async function appendTask(department, taskData) {
     row[idx] = taskData[def.key] !== undefined ? String(taskData[def.key]) : '';
   });
 
-  const range = `'${tab.sheetName}'!A:A`;
-
   try {
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range,
+      range: `'${tab.sheetName}'!A:A`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
-      requestBody: {
-        values: [row],
-      },
+      requestBody: { values: [row] },
     });
 
-    // Invalidate cache for this department
     cache.del(`tasks_${department}`);
 
-    return { success: true, updatedRange: response.data.updates?.updatedRange };
+    return {
+      success: true,
+      updatedRange: response.data.updates?.updatedRange,
+    };
+
   } catch (err) {
-    console.error(`❌ Error appending to ${department} sheet:`, err.message);
-    throw new Error(`Failed to write task to ${department} sheet: ${err.message}`);
+    console.error(`❌ Append error:`, err.message);
+    throw new Error(`Failed to write task: ${err.message}`);
   }
 }
 
-/**
- * Update specific fields in an existing task row
- * rowIndex is the 1-based sheet row number
- */
+
+// ───────── UPDATE ─────────
 async function updateTaskRow(department, rowIndex, updatedFields) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
@@ -200,21 +176,18 @@ async function updateTaskRow(department, rowIndex, updatedFields) {
   const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
 
-  // Build only the specific cell updates (not the entire row)
   const data = [];
 
   Object.entries(deptConfig.columns).forEach(([letter, def]) => {
     if (updatedFields.hasOwnProperty(def.key)) {
-      const colLetter = letter;
-      const cellRange = `'${tab.sheetName}'!${colLetter}${rowIndex}`;
       data.push({
-        range: cellRange,
+        range: `'${tab.sheetName}'!${letter}${rowIndex}`,
         values: [[String(updatedFields[def.key])]],
       });
     }
   });
 
-  if (data.length === 0) return { success: true, message: 'No fields to update' };
+  if (data.length === 0) return { success: true };
 
   try {
     await sheets.spreadsheets.values.batchUpdate({
@@ -225,20 +198,16 @@ async function updateTaskRow(department, rowIndex, updatedFields) {
       },
     });
 
-    // Invalidate cache
     cache.del(`tasks_${department}`);
-
     return { success: true };
+
   } catch (err) {
-    console.error(`❌ Error updating row ${rowIndex} in ${department}:`, err.message);
-    throw new Error(`Failed to update task in ${department} sheet: ${err.message}`);
+    throw new Error(`Failed to update: ${err.message}`);
   }
 }
 
-/**
- * Delete a task row from the sheet (clears the row content)
- * Note: We clear rather than delete to avoid row shift issues
- */
+
+// ───────── DELETE ─────────
 async function deleteTaskRow(department, rowIndex) {
   const deptConfig = DEPARTMENTS[department];
   if (!deptConfig) throw new Error(`Unknown department: ${department}`);
@@ -246,30 +215,25 @@ async function deleteTaskRow(department, rowIndex) {
   const spreadsheetId = deptConfig.spreadsheetId;
   const tab = deptConfig.tabs.tasks;
   const sheets = await getSheetsClient();
-  const totalCols = Object.keys(deptConfig.columns).length;
-  const lastColLetter = indexToColLetter(totalCols - 1);
+
+  const lastCol = indexToColLetter(Object.keys(deptConfig.columns).length - 1);
 
   try {
-    // Clear the entire row
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: `'${tab.sheetName}'!A${rowIndex}:${lastColLetter}${rowIndex}`,
+      range: `'${tab.sheetName}'!A${rowIndex}:${lastCol}${rowIndex}`,
     });
 
-    // Invalidate cache
     cache.del(`tasks_${department}`);
-
     return { success: true };
+
   } catch (err) {
-    console.error(`❌ Error deleting row ${rowIndex} in ${department}:`, err.message);
-    throw new Error(`Failed to delete task in ${department} sheet: ${err.message}`);
+    throw new Error(`Delete failed: ${err.message}`);
   }
 }
 
-/**
- * Read tasks across ALL departments
- * Returns consolidated list with department info attached
- */
+
+// ───────── READ ALL ─────────
 async function readAllDepartmentTasks(departments = Object.keys(DEPARTMENTS)) {
   const results = await Promise.allSettled(
     departments.map(async (dept) => {
@@ -278,72 +242,17 @@ async function readAllDepartmentTasks(departments = Object.keys(DEPARTMENTS)) {
     })
   );
 
-  const allTasks = [];
-  results.forEach((result, i) => {
-    if (result.status === 'fulfilled') {
-      allTasks.push(...result.value);
-    } else {
-      console.error(`Failed to read ${departments[i]}:`, result.reason?.message);
-    }
-  });
-
-  return allTasks;
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .flatMap(r => r.value);
 }
 
-/**
- * Manually invalidate cache for a department (or all)
- */
-function invalidateCache(department = null) {
-  if (department) {
-    cache.del(`tasks_${department}`);
-  } else {
-    cache.flushAll();
-  }
-}
 
-/**
- * Get cache statistics
- */
-function getCacheStats() {
-  return cache.getStats();
-}
-
-/**
- * Ensure header row exists in a department's sheet
- * Useful when setting up a new sheet
- */
-async function ensureSheetHeaders(department) {
-  const deptConfig = DEPARTMENTS[department];
-  if (!deptConfig) throw new Error(`Unknown department: ${department}`);
-
-  const spreadsheetId = deptConfig.spreadsheetId;
-  const tab = deptConfig.tabs.tasks;
-  const sheets = await getSheetsClient();
-
-  const headers = Object.values(deptConfig.columns).map(def => def.label);
-
-  try {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${tab.sheetName}'!A1`,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [headers],
-      },
-    });
-    return { success: true };
-  } catch (err) {
-    throw new Error(`Failed to write headers: ${err.message}`);
-  }
-}
-
+// ───────── EXPORT ─────────
 module.exports = {
   readDepartmentTasks,
   readAllDepartmentTasks,
   appendTask,
   updateTaskRow,
   deleteTaskRow,
-  invalidateCache,
-  getCacheStats,
-  ensureSheetHeaders,
 };

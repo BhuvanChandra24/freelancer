@@ -14,4 +14,4 @@ dist/
 
 # logs
 npm-debug.log*
-backend/config/service-account-key.json 
+backend/config/service-account.json
