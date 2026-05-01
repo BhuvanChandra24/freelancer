@@ -70,6 +70,7 @@ async function getSheetsClient() {
       auth,
     });
 
+    console.log("ENV LOADED:", process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.slice(0, 80));
     console.log('✅ Google Sheets client initialized');
 
     return sheetsClient;
