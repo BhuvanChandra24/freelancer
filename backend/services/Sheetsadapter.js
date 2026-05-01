@@ -35,31 +35,35 @@ async function getSheetsClient() {
 
     let credentials;
 
+    // 🔥 SAFE PARSE (handles all Render cases)
     try {
-      credentials = JSON.parse(raw);
+      credentials = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } catch (err) {
       console.error("❌ JSON PARSE ERROR:", err.message);
       throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_JSON format");
     }
 
-    // 🔥 VERY IMPORTANT FIX (handles all cases)
-    if (!credentials.private_key) {
-      throw new Error("❌ private_key missing in credentials");
+    // 🔥 VALIDATION
+    if (!credentials.private_key || !credentials.client_email) {
+      throw new Error("❌ Missing required credentials fields");
     }
 
-    // Normalize key (fixes JWT signature issue)
-    credentials.private_key = credentials.private_key
-      .replace(/\\n/g, '\n')
-      .replace(/\r/g, '');
+    // 🔥 CRITICAL FIX (JWT SIGNATURE FIX)
+    const privateKey = credentials.private_key
+      .replace(/\\n/g, '\n')   // fix escaped newlines
+      .replace(/\r/g, '')      // remove carriage returns
+      .trim();                 // remove extra spaces
 
-    // Debug (safe)
-    console.log("🔑 Client Email:", credentials.client_email);
-    console.log("🔑 Private Key starts with:", credentials.private_key.slice(0, 30));
+    // 🔥 DEBUG (safe)
+    console.log("🔑 Using Service Account:", credentials.client_email);
+    console.log("🔑 Key starts with:", privateKey.slice(0, 30));
 
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    const auth = new google.auth.JWT(
+      credentials.client_email,
+      null,
+      privateKey,
+      ['https://www.googleapis.com/auth/spreadsheets']
+    );
 
     sheetsClient = google.sheets({
       version: 'v4',
