@@ -1,19 +1,6 @@
-/**
- * Task.js — MODIFIED
- * ============================================================
- * Added Google Sheets sync fields:
- *   - sheetTaskId      : the "id" value from Col A of the sheet
- *   - sheetRowIndex    : the 1-based row number in the sheet
- *   - assignedToUsername / createdByUsername : string copies
- *     kept alongside the ObjectId refs so sync logic can
- *     write back to sheets without resolving references.
- *   - lastSyncedAt     : timestamp of last successful sync
- *
- * Every other field is unchanged.
- * ============================================================
- */
-
 const mongoose = require('mongoose');
+
+const ALLOWED_DEPARTMENTS = ['CRM', 'Production', 'Store', 'Commercial', 'AfterSales'];
 
 const taskSchema = new mongoose.Schema(
   {
@@ -22,72 +9,102 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
     description: {
       type: String,
       default: '',
     },
+
     department: {
       type: String,
-      enum: ['CRM', 'Production', 'Store', 'Commercial', 'AfterSales'],
+      enum: ALLOWED_DEPARTMENTS,
       required: true,
+      set: v => v.trim(), // normalize
     },
+
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
     },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
     },
+
     deadline: {
       type: Date,
       required: true,
     },
+
     status: {
       type: String,
       enum: ['pending', 'in-progress', 'completed'],
       default: 'pending',
+      set: v => v.toLowerCase(),
     },
+
     priority: {
       type: String,
       enum: ['low', 'medium', 'high'],
       default: 'medium',
+      set: v => v.toLowerCase(), // 🔥 fixes "Medium" bug
     },
+
     extraFields: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
 
-    // ── Google Sheets sync fields (NEW) ──────────────────────
-    /** Value from Col A of the department sheet (e.g. "TASK-CRM-1714300000000") */
+    // ── Google Sheets sync fields ───────────────────────────
     sheetTaskId: {
       type: String,
       index: true,
     },
-    /** 1-based row number in the department sheet */
+
     sheetRowIndex: {
       type: Number,
     },
-    /** Username string — kept in sync with sheet Col D (assignedTo) */
+
     assignedToUsername: {
       type: String,
       default: '',
     },
-    /** Username string — kept in sync with sheet Col J (createdBy) */
+
     createdByUsername: {
       type: String,
       default: '',
     },
-    /** Timestamp when this task was last successfully synced to/from Sheets */
+
     lastSyncedAt: {
       type: Date,
     },
-    // ─────────────────────────────────────────────────────────
   },
   { timestamps: true }
 );
 
-// Compound index: fast lookup by department + sheetTaskId
+// 🔥 Auto-sync usernames (no manual work needed)
+taskSchema.pre('save', async function (next) {
+  try {
+    if (this.isModified('assignedTo') || !this.assignedToUsername) {
+      const user = await mongoose.model('User').findById(this.assignedTo);
+      if (user) this.assignedToUsername = user.username;
+    }
+
+    if (this.isModified('createdBy') || !this.createdByUsername) {
+      const user = await mongoose.model('User').findById(this.createdBy);
+      if (user) this.createdByUsername = user.username;
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔥 Index for fast lookup
 taskSchema.index({ department: 1, sheetTaskId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Task', taskSchema);

@@ -18,78 +18,81 @@ export default function LoginPage() {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setPendingApproval(false);
-    setLoading(true);
+  e.preventDefault();
+  setError('');
+  setSuccess('');
+  setPendingApproval(false);
+  setLoading(true);
 
-    try {
-      if (isSignup) {
-        console.log("🟡 SIGNUP DATA:", form);
+  try {
+    if (isSignup) {
+      console.log("🟡 SIGNUP DATA:", form);
 
-        const result = await signup({
-          username: form.username.trim(),
-          password: form.password.trim(),
-          email: form.email.trim(),
-          role: form.role,
-          departments: form.department ? [form.department] : [],
-        });
-
-        console.log("✅ SIGNUP SUCCESS");
-
-        // FEATURE: Manager Approval System
-        // If a manager signs up, show pending approval notice instead of logging in
-        if (form.role === 'manager' || result?.pendingApproval) {
-          setPendingApproval(true);
-          setIsSignup(false);
-          setForm(p => ({ ...p, password: '', role: 'employee' }));
-        } else {
-          setSuccess('Account created! Please log in.');
-          setIsSignup(false);
-          setForm(p => ({ ...p, password: '' }));
-        }
-
-      } else {
-        console.log("🔐 LOGIN REQUEST:", form.username);
-
-        const user = await login(
-          form.username.trim(),
-          form.password.trim()
-        );
-
-        console.log("✅ LOGIN RESPONSE:", user);
-
-        if (!user) {
-          throw new Error("Login failed - no user returned");
-        }
-
-        navigate(
-          user.role === 'manager' || user.role === 'admin'
-            ? '/mis'
-            : '/dashboard'
-        );
-      }
-
-    } catch (err) {
-      console.error("❌ AUTH ERROR:", err);
-
-      // FEATURE: Manager Approval System — show friendly pending approval message
-      if (err?.response?.data?.pendingApproval) {
-        setPendingApproval(true);
+      // 🔥 ✅ NEW VALIDATION (ADDED)
+      if (form.role === 'manager' && !form.department) {
+        setError("Manager must select a department");
+        setLoading(false);
         return;
       }
 
-      setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        (isSignup ? 'Signup failed' : 'Login failed')
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      const result = await signup({
+        username: form.username.trim(),
+        password: form.password.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        departments: form.department ? [form.department] : [],
+      });
 
+      console.log("✅ SIGNUP SUCCESS");
+
+      if (form.role === 'manager' || result?.pendingApproval) {
+        setPendingApproval(true);
+        setIsSignup(false);
+        setForm(p => ({ ...p, password: '', role: 'employee' }));
+      } else {
+        setSuccess('Account created! Please log in.');
+        setIsSignup(false);
+        setForm(p => ({ ...p, password: '' }));
+      }
+
+    } else {
+      console.log("🔐 LOGIN REQUEST:", form.username);
+
+      const user = await login(
+        form.username.trim(),
+        form.password.trim()
+      );
+
+      console.log("✅ LOGIN RESPONSE:", user);
+
+      if (!user) {
+        throw new Error("Login failed - no user returned");
+      }
+
+      navigate(
+        user.role === 'manager' || user.role === 'admin'
+          ? '/mis'
+          : '/dashboard'
+      );
+    }
+
+  } catch (err) {
+    console.error("❌ AUTH ERROR:", err);
+
+    if (err?.response?.data?.pendingApproval) {
+      setPendingApproval(true);
+      return;
+    }
+
+    setError(
+      err?.response?.data?.message ||
+      err?.message ||
+      (isSignup ? 'Signup failed' : 'Login failed')
+    );
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', background: 'var(--ink)',

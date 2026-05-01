@@ -174,63 +174,73 @@ router.get('/:department/:rowIndex', auth, async (req, res) => {
 router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
   try {
     const user = req.user;
-    const { title, description, assignedTo, department, deadline, priority } = req.body;
+    let { title, description, assignedTo, department, deadline, priority } = req.body;
 
-    // ✅ 1. Validate user
+    // 🔥 ✅ NEW: normalize department
+    const normalizedDepartment = (department || '').trim();
+
+    // 🔥 ✅ NEW: normalize priority
+    const normalizedPriority = (priority || 'medium').toLowerCase();
+
+    // ✅ Validate user
     const assignedUser = await User.findOne({ username: assignedTo });
     if (!assignedUser) {
       return res.status(404).json({ message: 'Assigned user not found' });
     }
 
-    // ✅ 2. Generate Sheet Task ID (IMPORTANT)
-    const sheetTaskId = `TASK-${department.substring(0,3).toUpperCase()}-${Date.now()}`;
+    // ✅ Generate Sheet Task ID
+    const sheetTaskId = `TASK-${normalizedDepartment.substring(0,3).toUpperCase()}-${Date.now()}`;
 
-    // ✅ 3. Create in MongoDB FIRST
+    // ✅ Create in MongoDB
     const newTask = await Task.create({
       title,
       description,
-      department,
+      department: normalizedDepartment,
       assignedTo: assignedUser._id,
       createdBy: user._id,
       deadline: new Date(deadline),
-      priority: priority || 'medium',
 
-      // 🔥 important for sheets sync
+      // 🔥 FIXED
+      priority: normalizedPriority,
+
       sheetTaskId,
+
+      // ✅ kept (as you requested not to remove anything)
       assignedToUsername: assignedUser.username,
       createdByUsername: user.username,
     });
 
-    // ✅ 4. Append to Google Sheets
+    // ✅ Append to Google Sheets
     let sheetRowIndex = null;
 
     try {
-      const sheetResponse = await appendTask(department, {
+      const sheetResponse = await appendTask(normalizedDepartment, {
         id: sheetTaskId,
         title,
         description,
         assignedTo: assignedUser.username,
         deadline,
-        priority: priority || 'Medium',
+
+        // 🔥 FIXED HERE ALSO
+        priority: normalizedPriority,
+
         status: 'Pending',
         createdBy: user.username,
       });
 
-      // 👉 You must return rowIndex from appendTask
       sheetRowIndex = sheetResponse?.rowIndex || null;
 
     } catch (err) {
       console.error("❌ Sheets Error:", err.message);
     }
 
-    // ✅ 5. Update DB with sheet metadata
+    // ✅ Update DB
     if (sheetRowIndex) {
       newTask.sheetRowIndex = sheetRowIndex;
       newTask.lastSyncedAt = new Date();
       await newTask.save();
     }
 
-    // ✅ 6. Populate response
     const populatedTask = await Task.findById(newTask._id)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email');
