@@ -173,16 +173,22 @@ router.get('/:department/:rowIndex', auth, async (req, res) => {
 // ─── POST /api/tasks ───────────────────────────────────────────────────────────
 router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
   try {
-    const user = req.user;
+    const authUser = req.user;
+
+    // 🔥 NEW: Fetch full user from DB (CRITICAL FIX)
+    const dbUser = await User.findOne({ username: authUser.username });
+
+    if (!dbUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     let { title, description, assignedTo, department, deadline, priority } = req.body;
 
-    // 🔥 ✅ NEW: normalize department
+    // 🔥 EXISTING + SAFE NORMALIZATION
     const normalizedDepartment = (department || '').trim();
-
-    // 🔥 ✅ NEW: normalize priority
     const normalizedPriority = (priority || 'medium').toLowerCase();
 
-    // ✅ Validate user
+    // ✅ Validate assigned user
     const assignedUser = await User.findOne({ username: assignedTo });
     if (!assignedUser) {
       return res.status(404).json({ message: 'Assigned user not found' });
@@ -191,23 +197,23 @@ router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
     // ✅ Generate Sheet Task ID
     const sheetTaskId = `TASK-${normalizedDepartment.substring(0,3).toUpperCase()}-${Date.now()}`;
 
-    // ✅ Create in MongoDB
+    // ✅ Create in MongoDB (FIXED createdBy)
     const newTask = await Task.create({
       title,
       description,
       department: normalizedDepartment,
       assignedTo: assignedUser._id,
-      createdBy: user._id,
+
+      // 🔥 FIXED HERE
+      createdBy: dbUser._id,
+
       deadline: new Date(deadline),
-
-      // 🔥 FIXED
       priority: normalizedPriority,
-
       sheetTaskId,
 
-      // ✅ kept (as you requested not to remove anything)
+      // ✅ kept (no removal)
       assignedToUsername: assignedUser.username,
-      createdByUsername: user.username,
+      createdByUsername: dbUser.username,
     });
 
     // ✅ Append to Google Sheets
@@ -220,12 +226,9 @@ router.post('/', auth, requireRole('manager', 'admin'), async (req, res) => {
         description,
         assignedTo: assignedUser.username,
         deadline,
-
-        // 🔥 FIXED HERE ALSO
         priority: normalizedPriority,
-
         status: 'Pending',
-        createdBy: user.username,
+        createdBy: dbUser.username, // 🔥 FIXED
       });
 
       sheetRowIndex = sheetResponse?.rowIndex || null;
